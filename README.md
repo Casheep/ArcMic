@@ -29,23 +29,25 @@ Windows 游戏麦克风增益与本地降噪工具。
 
 ArcMic 处理 Windows 共享模式录音流，适用于大多数使用 WASAPI 或 DirectSound 的游戏。WASAPI RAW、WASAPI Exclusive 和 ASIO 会绕过 Windows 系统音效，因此也会绕过 ArcMic。
 
-## 开源许可
+## References
 
-ArcMic 集成并随 EXE 分发以下开源组件，但没有修改它们的源码。它们仍归原作者所有；使用或再分发 ArcMic 时应保留许可证与源码获取方式：
-
-- [Equalizer APO 1.4.2](https://sourceforge.net/projects/equalizerapo/files/1.4.2/)（GPL-2.0-or-later）：Windows 系统级低延迟麦克风处理
-- [Real-time Noise Suppression Plugin 1.21](https://github.com/werman/noise-suppression-for-voice/tree/v1.21)（GPL-3.0）：基于 RNNoise 的本地 AI 降噪
-
-界面、监听和打包还使用了以下开源项目：
-
-- [Python 3.12.10](https://www.python.org/)（PSF License）：界面与设置逻辑
-- [python-sounddevice 0.5.2 / PortAudio](https://python-sounddevice.readthedocs.io/)（MIT）：输入电平与耳机监听
-- [CFFI 2.1.1](https://cffi.readthedocs.io/)（MIT）和 [pycparser 3.0](https://github.com/eliben/pycparser)（BSD-3-Clause）：本地音频接口支持
-- [PyInstaller 6.16.0](https://pyinstaller.org/)（GPL，带 Bootloader Exception）：生成单文件 EXE
-- [pystray 0.19.5](https://github.com/moses-palmer/pystray)（LGPL-3.0）、[six 1.17.0](https://github.com/benjaminp/six)（MIT）和 [Pillow 11.3.0](https://python-pillow.github.io/)（MIT-CMU）：系统托盘与图标
-
-各组件的许可证原文保存在 [`vendor/licenses`](vendor/licenses)。
+- [Equalizer APO 1.4.2](https://sourceforge.net/projects/equalizerapo/files/1.4.2/)：Windows 系统级低延迟麦克风处理
+- [Real-time Noise Suppression Plugin 1.21](https://github.com/werman/noise-suppression-for-voice/tree/v1.21)：基于 RNNoise 的本地 AI 降噪
+- [Python 3.12.10](https://www.python.org/)：界面与设置逻辑
+- [python-sounddevice 0.5.2 / PortAudio](https://python-sounddevice.readthedocs.io/)：输入电平与耳机监听
+- [CFFI 2.1.1](https://cffi.readthedocs.io/)：Python 与本地音频接口连接
+- [pycparser 3.0](https://github.com/eliben/pycparser)：CFFI 解析支持
+- [PyInstaller 6.16.0](https://pyinstaller.org/)：生成单文件 EXE
+- [PyInstaller Hooks Contrib 2026.7](https://github.com/pyinstaller/pyinstaller-hooks-contrib)：PyInstaller 第三方库打包支持
+- [altgraph 0.17.5](https://github.com/ronaldoussoren/altgraph)：构建依赖关系分析
+- [packaging 26.3](https://github.com/pypa/packaging)：构建版本与包信息处理
+- [pefile 2023.2.7](https://github.com/erocarrera/pefile)：Windows PE 文件处理
+- [pywin32-ctypes 0.2.3](https://github.com/enthought/pywin32-ctypes)：Windows 构建接口支持
+- [setuptools 84.0.0](https://github.com/pypa/setuptools)：Python 构建支持
+- [pystray 0.19.5](https://github.com/moses-palmer/pystray)：系统托盘
+- [six 1.17.0](https://github.com/benjaminp/six)：pystray 兼容支持
+- [Pillow 11.3.0](https://python-pillow.github.io/)：托盘图标处理
 
 ## 许可证
 
-ArcMic 采用 [GNU General Public License v3.0](LICENSE)。选择 GPL-3.0 是因为项目集成了 GPL-2.0-or-later 的 Equalizer APO 和 GPL-3.0 的 RNNoise 插件；其他第三方组件继续遵循各自许可证。
+ArcMic 采用 [GNU General Public License v3.0](LICENSE)。
