@@ -23,6 +23,7 @@ a = Analysis(
     ] + [
         (str(root / "vendor" / "rnnoise" / "rnnoise_mono.dll"), "vendor/rnnoise"),
         (str(root / "vendor" / "licenses"), "licenses"),
+        (str(root / "LICENSE"), "licenses"),
         (str(root / "assets" / "app.ico"), "assets"),
     ],
     hiddenimports=["pystray._win32"],
