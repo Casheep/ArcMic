@@ -1,7 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="ArcMic logo">
-  <rect x="10" y="10" width="236" height="236" rx="66" fill="#5B73F2"/>
-  <path d="M199 82a82 82 0 1 1-25-25" fill="none" stroke="#fff" stroke-width="24" stroke-linecap="round"/>
-  <path d="M166 99a47 47 0 1 1-16-14" fill="none" stroke="#BEC9FF" stroke-width="18" stroke-linecap="round"/>
-  <circle cx="128" cy="128" r="15" fill="#fff"/>
+  <defs>
+    <clipPath id="portrait"><circle cx="128" cy="128" r="74"/></clipPath>
+  </defs>
+  <path d="M228 92a106 106 0 1 1-200 0" fill="none" stroke="#506CF5" stroke-width="20" stroke-linecap="round"/>
+  <circle cx="128" cy="128" r="79" fill="#fff"/>
+  <image href="maomao-headphones.png" x="54" y="54" width="148" height="148" preserveAspectRatio="xMidYMid slice" clip-path="url(#portrait)"/>
 </svg>
-

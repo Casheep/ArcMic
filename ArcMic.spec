@@ -25,6 +25,7 @@ a = Analysis(
         (str(root / "vendor" / "licenses"), "licenses"),
         (str(root / "LICENSE"), "licenses"),
         (str(root / "assets" / "app.ico"), "assets"),
+        (str(root / "assets" / "app.png"), "assets"),
     ],
     hiddenimports=["pystray._win32"],
     hookspath=[],

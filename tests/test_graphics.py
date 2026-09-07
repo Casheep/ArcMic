@@ -1,6 +1,6 @@
 import unittest
 
-from arcmic.graphics import arc_logo, gain_dial, level_meter, pill_switch, rounded_panel, status_dot
+from arcmic.graphics import gain_dial, level_meter, meter_level_from_amplitude, pill_switch, rounded_panel, status_dot
 
 
 class GraphicsTests(unittest.TestCase):
@@ -8,7 +8,6 @@ class GraphicsTests(unittest.TestCase):
         self.assertEqual(rounded_panel(121, 47, 12, fill="#ffffff", background="#000000").size, (121, 47))
         self.assertEqual(pill_switch(52, 30, 1.0, True, background="#ffffff", accent="#506cf5").size, (52, 30))
         self.assertEqual(level_meter(311, 18, 1.0, 0.5, background="#ffffff", track="#eeeeee", colour="#20b97a").size, (311, 18))
-        self.assertEqual(arc_logo(46, 1.0, background="#ffffff", accent="#506cf5").size, (46, 46))
         self.assertEqual(status_dot(12, 1.0, background="#ffffff", colour="#20b97a").size, (12, 12))
         self.assertEqual(
             gain_dial(
@@ -55,6 +54,41 @@ class GraphicsTests(unittest.TestCase):
         ).convert("RGB")
         self.assertEqual(image.getpixel((143, 18)), (225, 229, 237))
         self.assertEqual(image.getpixel((143, 34)), (255, 255, 255))
+
+    def test_volume_meter_uses_decibel_scale(self):
+        self.assertEqual(meter_level_from_amplitude(0.0), 0.0)
+        self.assertEqual(meter_level_from_amplitude(1.0), 1.0)
+        self.assertAlmostEqual(meter_level_from_amplitude(0.1), 2 / 3, places=6)
+
+    def test_full_volume_fills_the_complete_meter_track(self):
+        image = level_meter(
+            311,
+            18,
+            1.0,
+            1.0,
+            background="#ffffff",
+            track="#e1e5ed",
+            colour="#20b97a",
+        ).convert("RGB")
+        self.assertEqual(image.getpixel((8, 9)), (32, 185, 122))
+        self.assertEqual(image.getpixel((302, 9)), (32, 185, 122))
+
+    def test_partial_volume_has_a_semicircular_leading_end(self):
+        image = level_meter(
+            200,
+            18,
+            1.0,
+            0.5,
+            background="#ffffff",
+            track="#e1e5ed",
+            colour="#20b97a",
+        ).convert("RGB")
+        # The green segment ends as a half circle: its centre reaches farther
+        # right than its top edge.
+        centre = image.getpixel((99, 9))
+        top = image.getpixel((99, 2))
+        self.assertGreater(centre[1], centre[0] + 100)
+        self.assertNotEqual(top, centre)
 
 
 if __name__ == "__main__":

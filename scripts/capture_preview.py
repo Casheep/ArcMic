@@ -14,7 +14,7 @@ def capture() -> None:
     # Pillow uses PrintWindow for a window handle, so the system pointer and
     # anything covering the app are not captured.
     preview = ImageGrab.grab(window=app.root.winfo_id())
-    output = ROOT / "docs" / "ui-preview.png"
+    output = ROOT / "docs" / "ui-preview-v0.2.8.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     preview.save(output, optimize=True)
     app.close()

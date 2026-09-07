@@ -8,7 +8,7 @@ import tkinter as tk
 from dataclasses import replace
 from tkinter import messagebox, ttk
 
-from PIL import ImageTk
+from PIL import Image, ImageTk
 
 from .config import AppSettings, MAX_GAIN_DB, SettingsStore, write_managed_config
 from .devices import (
@@ -23,9 +23,9 @@ from .devices import (
 )
 from .engine import installation_ready, resource_path, run_elevated_and_wait
 from .graphics import (
-    arc_logo as render_arc_logo,
     gain_dial as render_gain_dial,
     level_meter as render_level_meter,
+    meter_level_from_amplitude,
     pill_switch as render_pill_switch,
     rounded_panel as render_rounded_panel,
     status_dot as render_status_dot,
@@ -206,7 +206,7 @@ class LevelBar(tk.Canvas):
             self.draw(force=True)
 
     def set_level(self, level: float):
-        self.level = min(1.0, max(0.0, float(level)))
+        self.level = meter_level_from_amplitude(level)
 
     def animate(self):
         previous = self.display_level
@@ -476,7 +476,9 @@ class ArcMicApp:
         header.pack(fill="x")
         logo = tk.Canvas(header, width=self._px(46), height=self._px(46), bg=BG, highlightthickness=0)
         logo.pack(side="left", padx=(0, self._px(13)))
-        logo._image = ImageTk.PhotoImage(render_arc_logo(self._px(46), self.ui_scale, background=BG, accent=ACCENT))
+        with Image.open(resource_path("assets", "app.png")) as source:
+            logo_image = source.convert("RGBA").resize((self._px(46), self._px(46)), Image.Resampling.LANCZOS)
+        logo._image = ImageTk.PhotoImage(logo_image)
         logo.create_image(0, 0, anchor="nw", image=logo._image)
         title_wrap = tk.Frame(header, bg=BG)
         title_wrap.pack(side="left")
@@ -562,7 +564,7 @@ class ArcMicApp:
         meter_canvas.configure(height=self._px(88))
         top = tk.Frame(meter_card, bg=CARD)
         top.pack(fill="x")
-        tk.Label(top, text="实时输入电平", bg=CARD, fg=TEXT, font=(UI_FONT, 10, "bold")).pack(side="left")
+        tk.Label(top, text="实时音量", bg=CARD, fg=TEXT, font=(UI_FONT, 10, "bold")).pack(side="left")
         tk.Label(top, text="仅本机处理 · 不录音 · 不上传", bg=CARD, fg=GREEN, font=(UI_FONT, 9)).pack(side="right")
         self.level_bar = LevelBar(meter_card, scale=self.ui_scale)
         self.level_bar.pack(fill="x", pady=(self._px(11), 0))

@@ -16,6 +16,15 @@ def _finish(image: Image.Image, width: int, height: int) -> Image.Image:
     return image.resize(_size(width, height), Image.Resampling.LANCZOS)
 
 
+def meter_level_from_amplitude(amplitude: float, floor_db: float = -60.0) -> float:
+    """Map a linear audio peak to a useful logarithmic display position."""
+    amplitude = min(1.0, max(0.0, float(amplitude)))
+    if amplitude <= 0.0:
+        return 0.0
+    decibels = 20.0 * math.log10(amplitude)
+    return min(1.0, max(0.0, (decibels - floor_db) / -floor_db))
+
+
 def _centred_arc(
     draw: ImageDraw.ImageDraw,
     box: tuple[float, float, float, float],
@@ -40,6 +49,34 @@ def _centred_arc(
         fill=fill,
         width=width,
     )
+    centre_x = (left + right) / 2
+    centre_y = (top + bottom) / 2
+    radius_x = (right - left) / 2
+    radius_y = (bottom - top) / 2
+    for angle in (start, end):
+        radians = math.radians(angle)
+        x = centre_x + radius_x * math.cos(radians)
+        y = centre_y + radius_y * math.sin(radians)
+        draw.ellipse(
+            (x - half_width, y - half_width, x + half_width, y + half_width),
+            fill=fill,
+        )
+
+
+def _capsule(
+    draw: ImageDraw.ImageDraw,
+    left: float,
+    top: float,
+    right: float,
+    bottom: float,
+    fill: str,
+) -> None:
+    """Draw a pill with exact semicircular ends instead of corner rounding."""
+    radius = (bottom - top) / 2
+    right = max(right, left + radius * 2)
+    draw.rectangle((left + radius, top, right - radius, bottom), fill=fill)
+    draw.ellipse((left, top, left + radius * 2, bottom), fill=fill)
+    draw.ellipse((right - radius * 2, top, right, bottom), fill=fill)
 
 
 def rounded_panel(
@@ -123,7 +160,9 @@ def gain_dial(
     angle = math.radians(start + span * ratio)
     thumb_x = (centre[0] + radius * math.cos(angle)) * scale * factor
     thumb_y = (centre[1] - radius * math.sin(angle)) * scale * factor
-    thumb_radius = 8 * scale * factor
+    # Slightly overlap both sides of the 18 px arc. This fully hides the arc's
+    # flat endpoint and leaves one clean circular drag handle.
+    thumb_radius = 10 * scale * factor
     outline_width = max(1, round(4 * scale * factor))
     draw.ellipse(
         (
@@ -144,31 +183,16 @@ def level_meter(width: int, height: int, scale: float, level: float, *, backgrou
     factor = SUPERSAMPLE
     image = Image.new("RGBA", (width * factor, height * factor), background)
     draw = ImageDraw.Draw(image)
-    top, bottom = 4 * scale * factor, 14 * scale * factor
-    radius = 5 * scale * factor
-    draw.rounded_rectangle((0, top, width * factor, bottom), radius=radius, fill=track)
-    progress = width * min(1.0, max(0.0, level)) * factor
-    if progress > 0:
-        draw.rounded_rectangle((0, top, progress, bottom), radius=radius, fill=colour)
+    inset = max(1, round(scale)) * factor
+    left, right = inset, width * factor - inset - 1
+    top, bottom = 2 * scale * factor, 16 * scale * factor
+    _capsule(draw, left, top, right, bottom, track)
+
+    level = min(1.0, max(0.0, level))
+    if level > 0.0:
+        progress_right = round(left + (right - left) * level)
+        _capsule(draw, left, top, progress_right, bottom, colour)
     return _finish(image, width, height)
-
-
-def arc_logo(size: int, scale: float, *, background: str, accent: str) -> Image.Image:
-    size = max(1, int(size))
-    factor = SUPERSAMPLE
-    image = Image.new("RGBA", (size * factor, size * factor), background)
-    draw = ImageDraw.Draw(image)
-
-    def box(values: tuple[float, float, float, float]) -> tuple[float, float, float, float]:
-        return tuple(value * scale * factor for value in values)
-
-    # Tk starts at 38 degrees above the x-axis and sweeps counter-clockwise.
-    # Pillow's angles grow clockwise in screen coordinates, so -38 is the
-    # matching starting point and the 285-degree sweep can stay positive.
-    _centred_arc(draw, box((4, 4, 42, 42)), 322, 607, accent, round(5 * scale * factor))
-    _centred_arc(draw, box((12, 12, 34, 34)), 322, 607, "#A8B5FF", round(5 * scale * factor))
-    draw.ellipse(box((19, 19, 27, 27)), fill=accent)
-    return _finish(image, size, size)
 
 
 def status_dot(size: int, scale: float, *, background: str, colour: str) -> Image.Image:
