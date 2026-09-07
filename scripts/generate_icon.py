@@ -11,25 +11,11 @@ OUTPUT_SIZE = 256
 SCALE = 4
 SIZE = OUTPUT_SIZE * SCALE
 CENTRE = SIZE / 2
-ACCENT = (80, 108, 245, 255)
 
 image = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-draw = ImageDraw.Draw(image)
 
-# A complete, even ring stays clean at taskbar and tray sizes and does not
-# create competing endpoints around the MaoMao portrait.
-arc_radius = 106 * SCALE
-arc_width = 20 * SCALE
-arc_box = (CENTRE - arc_radius, CENTRE - arc_radius, CENTRE + arc_radius, CENTRE + arc_radius)
-draw.ellipse(arc_box, outline=ACCENT, width=arc_width)
-
-# Use the existing MaoMao project artwork as the circular centre mark.
-portrait_radius = 74 * SCALE
-border_radius = 79 * SCALE
-draw.ellipse(
-    (CENTRE - border_radius, CENTRE - border_radius, CENTRE + border_radius, CENTRE + border_radius),
-    fill=(255, 255, 255, 255),
-)
+# Use the MaoMao artwork directly as the icon, without a competing outer ring.
+portrait_radius = 110 * SCALE
 portrait_size = round(portrait_radius * 2)
 with Image.open(ASSETS / "maomao-headphones.png") as source:
     portrait = ImageOps.fit(source.convert("RGBA"), (portrait_size, portrait_size), method=Image.Resampling.LANCZOS)
