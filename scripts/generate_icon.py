@@ -1,4 +1,3 @@
-import math
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageOps
@@ -14,28 +13,15 @@ SIZE = OUTPUT_SIZE * SCALE
 CENTRE = SIZE / 2
 ACCENT = (80, 108, 245, 255)
 
-
-def point_on_circle(radius: float, angle: float) -> tuple[float, float]:
-    radians = math.radians(angle)
-    return CENTRE + radius * math.cos(radians), CENTRE + radius * math.sin(radians)
-
-
 image = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
 draw = ImageDraw.Draw(image)
 
-# A single open audio arc keeps ArcMic recognisable without competing with the
-# MaoMao artwork. Pillow arc strokes have square ends, so add circular caps.
+# A complete, even ring stays clean at taskbar and tray sizes and does not
+# create competing endpoints around the MaoMao portrait.
 arc_radius = 106 * SCALE
 arc_width = 20 * SCALE
 arc_box = (CENTRE - arc_radius, CENTRE - arc_radius, CENTRE + arc_radius, CENTRE + arc_radius)
-# Put the opening at the upper-right (315 degrees), giving the ring the same
-# lively 45-degree tilt as the original ArcMic mark.
-arc_start, arc_end = 25, 245
-draw.arc(arc_box, start=arc_start, end=arc_end, fill=ACCENT, width=arc_width)
-cap_radius = arc_width / 2
-for angle in (arc_start, arc_end):
-    x, y = point_on_circle(arc_radius - arc_width / 2, angle)
-    draw.ellipse((x - cap_radius, y - cap_radius, x + cap_radius, y + cap_radius), fill=ACCENT)
+draw.ellipse(arc_box, outline=ACCENT, width=arc_width)
 
 # Use the existing MaoMao project artwork as the circular centre mark.
 portrait_radius = 74 * SCALE
