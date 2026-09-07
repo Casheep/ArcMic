@@ -1,0 +1,14 @@
+.cache/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+build/
+dist/
+*.spec.bak
+artifacts/
+
+# Runtime state is deliberately kept outside the repository.
+settings.json
+ArcMic.txt
+
