@@ -47,7 +47,3 @@ ArcMic 处理 Windows 共享模式录音流，适用于大多数使用 WASAPI �
 - [pystray 0.19.5](https://github.com/moses-palmer/pystray)：系统托盘
 - [six 1.17.0](https://github.com/benjaminp/six)：pystray 兼容支持
 - [Pillow 11.3.0](https://python-pillow.github.io/)：托盘图标处理
-
-## 许可证
-
-ArcMic 采用 [GNU General Public License v3.0](LICENSE)。
