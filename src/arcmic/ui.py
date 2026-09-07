@@ -6,8 +6,9 @@ import queue
 import threading
 import tkinter as tk
 from dataclasses import replace
-from pathlib import Path
 from tkinter import messagebox, ttk
+
+from PIL import ImageTk
 
 from .config import AppSettings, MAX_GAIN_DB, SettingsStore, write_managed_config
 from .devices import (
@@ -21,6 +22,14 @@ from .devices import (
     refresh_wasapi_devices,
 )
 from .engine import installation_ready, resource_path, run_elevated_and_wait
+from .graphics import (
+    arc_logo as render_arc_logo,
+    gain_dial as render_gain_dial,
+    level_meter as render_level_meter,
+    pill_switch as render_pill_switch,
+    rounded_panel as render_rounded_panel,
+    status_dot as render_status_dot,
+)
 from .monitor import AudioMonitor
 
 
@@ -55,24 +64,8 @@ NOISE_MODE_DESCRIPTIONS = {
     "ai_hum": "优先保证干净度，适合底噪明显的麦克风",
 }
 
-
-def rounded_rectangle(canvas: tk.Canvas, x1: float, y1: float, x2: float, y2: float, radius: float, **kwargs):
-    radius = min(radius, abs(x2 - x1) / 2, abs(y2 - y1) / 2)
-    points = [
-        x1 + radius, y1,
-        x2 - radius, y1,
-        x2, y1,
-        x2, y1 + radius,
-        x2, y2 - radius,
-        x2, y2,
-        x2 - radius, y2,
-        x1 + radius, y2,
-        x1, y2,
-        x1, y2 - radius,
-        x1, y1 + radius,
-        x1, y1,
-    ]
-    return canvas.create_polygon(points, smooth=True, splinesteps=24, **kwargs)
+UI_TICK_MS = 50
+HIDDEN_TICK_MS = 100
 
 
 class PillSwitch(tk.Canvas):
@@ -98,14 +91,16 @@ class PillSwitch(tk.Canvas):
 
     def draw(self):
         self.delete("all")
-        fill = ACCENT if self.value else "#CED2DA"
-        half = self._height / 2
-        self.create_oval(1, 1, self._height - 1, self._height - 1, fill=fill, outline="")
-        self.create_oval(self._width - self._height + 1, 1, self._width - 1, self._height - 1, fill=fill, outline="")
-        self.create_rectangle(half, 1, self._width - half, self._height - 1, fill=fill, outline="")
-        cx = self._width - self._height / 2 if self.value else self._height / 2
-        radius = 11 * self._scale
-        self.create_oval(cx - radius, self._height / 2 - radius, cx + radius, self._height / 2 + radius, fill="white", outline="")
+        image = render_pill_switch(
+            self._width,
+            self._height,
+            self._scale,
+            self.value,
+            background=CARD,
+            accent=ACCENT,
+        )
+        self._image = ImageTk.PhotoImage(image)
+        self.create_image(0, 0, anchor="nw", image=self._image)
 
 
 class GainDial(tk.Canvas):
@@ -115,7 +110,9 @@ class GainDial(tk.Canvas):
     RADIUS = 111.0
 
     def __init__(self, parent, value: float, command, scale: float = 1.0):
-        super().__init__(parent, width=round(286 * scale), height=round(252 * scale), highlightthickness=0, bg=CARD, cursor="hand2")
+        self._width = round(286 * scale)
+        self._height = round(252 * scale)
+        super().__init__(parent, width=self._width, height=self._height, highlightthickness=0, bg=CARD, cursor="hand2")
         self.value = float(value)
         self.command = command
         self._scale = scale
@@ -168,18 +165,23 @@ class GainDial(tk.Canvas):
     def draw(self):
         self.delete("all")
         p = lambda value: value * self._scale
-        box = tuple(p(value) for value in (32, 18, 254, 240))
-        self.create_arc(*box, start=self.START, extent=self.SPAN, style="arc", width=round(p(18)), outline=TRACK)
-        extent = self.SPAN * (self.value / MAX_GAIN_DB)
         colour = ACCENT if self.value <= 12 else (AMBER if self.value <= 20 else RED)
-        if self.value > 0:
-            self.create_arc(*box, start=self.START, extent=extent, style="arc", width=round(p(18)), outline=colour)
-
-        # Tk arcs and the thumb now share the exact same start, sweep and
-        # centreline radius. This keeps the draggable thumb on the painted arc.
-        point_x, point_y = self.point_for_value(self.value)
-        x, y = p(point_x), p(point_y)
-        self.create_oval(x - p(8), y - p(8), x + p(8), y + p(8), fill="white", outline=colour, width=round(p(4)))
+        image = render_gain_dial(
+            self._width,
+            self._height,
+            self._scale,
+            self.value,
+            MAX_GAIN_DB,
+            background=CARD,
+            track=TRACK,
+            colour=colour,
+            start=self.START,
+            span=self.SPAN,
+            centre=self.CENTER,
+            radius=self.RADIUS,
+        )
+        self._image = ImageTk.PhotoImage(image)
+        self.create_image(0, 0, anchor="nw", image=self._image)
         self.create_text(p(143), p(106), text=f"+{self.value:.1f}", fill=TEXT, font=(DISPLAY_FONT, 32, "bold"))
         self.create_text(p(143), p(145), text="dB 增益", fill=MUTED, font=(UI_FONT, 11))
         label = "舒适" if self.value <= 12 else ("强劲" if self.value <= 20 else "极高")
@@ -193,32 +195,135 @@ class LevelBar(tk.Canvas):
         self._scale = scale
         self.level = 0.0
         self.display_level = 0.0
+        self._last_render_key = None
         self.bind("<Configure>", self._resize)
-        self.draw()
+        self.draw(force=True)
 
     def _resize(self, event):
-        self._width = max(1, event.width)
-        self.draw()
+        width = max(1, event.width)
+        if width != self._width:
+            self._width = width
+            self.draw(force=True)
 
     def set_level(self, level: float):
         self.level = min(1.0, max(0.0, float(level)))
 
     def animate(self):
+        previous = self.display_level
         if self.level > self.display_level:
             self.display_level = self.level
         else:
             self.display_level *= 0.82
         self.level *= 0.70
-        self.draw()
+        if self.display_level < 0.001:
+            self.display_level = 0.0
+        if abs(self.display_level - previous) >= 0.002 or self.display_level == 0.0 < previous:
+            self.draw()
 
-    def draw(self):
+    def draw(self, force: bool = False):
+        colour = GREEN if self.display_level < 0.78 else (AMBER if self.display_level < 0.93 else RED)
+        render_key = (self._width, round(self.display_level, 3), colour)
+        if not force and render_key == self._last_render_key:
+            return
+        self._last_render_key = render_key
         self.delete("all")
-        y1, y2, radius = 4 * self._scale, 14 * self._scale, 5 * self._scale
-        rounded_rectangle(self, 0, y1, self._width, y2, radius, fill=TRACK, outline="")
-        width = max(0, self._width * self.display_level)
-        if width:
-            colour = GREEN if self.display_level < 0.78 else (AMBER if self.display_level < 0.93 else RED)
-            rounded_rectangle(self, 0, y1, width, y2, radius, fill=colour, outline="")
+        image = render_level_meter(
+            self._width,
+            round(18 * self._scale),
+            self._scale,
+            self.display_level,
+            background=CARD,
+            track=TRACK,
+            colour=colour,
+        )
+        self._image = ImageTk.PhotoImage(image)
+        self.create_image(0, 0, anchor="nw", image=self._image)
+
+
+class RoundedButton(tk.Canvas):
+    def __init__(self, parent, text: str, command, scale: float = 1.0):
+        self._scale = scale
+        self._height = round(43 * scale)
+        super().__init__(
+            parent,
+            height=self._height,
+            bg=CARD,
+            highlightthickness=0,
+            cursor="hand2",
+            takefocus=True,
+        )
+        self.command = command
+        self._text = text
+        self._background = ACCENT_LIGHT
+        self._active_background = "#DDE3FF"
+        self._foreground = ACCENT
+        self._hovered = False
+        self._pressed = False
+        self._last_render_key = None
+        self.bind("<Configure>", self._draw)
+        self.bind("<Enter>", self._enter)
+        self.bind("<Leave>", self._leave)
+        self.bind("<ButtonPress-1>", self._press)
+        self.bind("<ButtonRelease-1>", self._release)
+        self.bind("<Return>", self._invoke)
+        self.bind("<space>", self._invoke)
+
+    def set_appearance(self, *, text: str, background: str, foreground: str, active_background: str):
+        self._text = text
+        self._background = background
+        self._foreground = foreground
+        self._active_background = active_background
+        self._last_render_key = None
+        self._draw()
+
+    def _enter(self, _event=None):
+        self._hovered = True
+        self._draw()
+
+    def _leave(self, _event=None):
+        self._hovered = False
+        self._pressed = False
+        self._draw()
+
+    def _press(self, _event=None):
+        self._pressed = True
+        self._draw()
+
+    def _release(self, event):
+        was_pressed = self._pressed
+        self._pressed = False
+        self._draw()
+        if was_pressed and 0 <= event.x < self.winfo_width() and 0 <= event.y < self.winfo_height():
+            self.command()
+
+    def _invoke(self, _event=None):
+        self.command()
+        return "break"
+
+    def _draw(self, _event=None):
+        width = max(1, self.winfo_width())
+        background = self._active_background if self._hovered or self._pressed else self._background
+        render_key = (width, background, self._foreground, self._text)
+        if render_key == self._last_render_key:
+            return
+        self._last_render_key = render_key
+        image = render_rounded_panel(
+            width,
+            self._height,
+            12 * self._scale,
+            fill=background,
+            background=CARD,
+        )
+        self._image = ImageTk.PhotoImage(image)
+        self.delete("all")
+        self.create_image(0, 0, anchor="nw", image=self._image)
+        self.create_text(
+            width / 2,
+            self._height / 2,
+            text=self._text,
+            fill=self._foreground,
+            font=(UI_FONT, 11, "bold"),
+        )
 
 
 class ArcMicApp:
@@ -266,6 +371,7 @@ class ArcMicApp:
         self._save_job = None
         self._monitor_timeout = None
         self._setup_running = False
+        self._last_tray_title = ""
 
         self._configure_styles()
         self._build_ui()
@@ -333,25 +439,29 @@ class ArcMicApp:
         frame = tk.Frame(canvas, bg=CARD)
 
         def redraw(_event=None):
-            canvas.delete("card")
-            rounded_rectangle(
-                canvas,
-                1,
-                1,
-                canvas.winfo_width() - 1,
-                canvas.winfo_height() - 1,
-                self._px(24),
-                fill=CARD,
-                outline=BORDER,
-                width=self._px(1),
-                tags="card",
-            )
-            canvas.tag_lower("card")
+            width = max(1, canvas.winfo_width())
+            height = max(1, canvas.winfo_height())
+            render_key = (width, height)
+            if render_key != getattr(canvas, "_card_render_key", None):
+                canvas._card_render_key = render_key
+                image = render_rounded_panel(
+                    width,
+                    height,
+                    self._px(24),
+                    fill=CARD,
+                    background=BG,
+                    outline=BORDER,
+                    outline_width=self._px(1),
+                )
+                canvas._card_image = ImageTk.PhotoImage(image)
+                canvas.delete("card")
+                canvas.create_image(0, 0, anchor="nw", image=canvas._card_image, tags="card")
+                canvas.tag_lower("card")
             canvas.coords(window, self._px(24), self._px(22))
             canvas.itemconfigure(
                 window,
-                width=max(1, canvas.winfo_width() - self._px(48)),
-                height=max(1, canvas.winfo_height() - self._px(44)),
+                width=max(1, width - self._px(48)),
+                height=max(1, height - self._px(44)),
             )
 
         window = canvas.create_window(self._px(24), self._px(22), window=frame, anchor="nw")
@@ -366,9 +476,8 @@ class ArcMicApp:
         header.pack(fill="x")
         logo = tk.Canvas(header, width=self._px(46), height=self._px(46), bg=BG, highlightthickness=0)
         logo.pack(side="left", padx=(0, self._px(13)))
-        logo.create_arc(*(self._px(v) for v in (4, 4, 42, 42)), start=38, extent=285, style="arc", width=self._px(5), outline=ACCENT)
-        logo.create_arc(*(self._px(v) for v in (12, 12, 34, 34)), start=38, extent=285, style="arc", width=self._px(5), outline="#A8B5FF")
-        logo.create_oval(*(self._px(v) for v in (19, 19, 27, 27)), fill=ACCENT, outline="")
+        logo._image = ImageTk.PhotoImage(render_arc_logo(self._px(46), self.ui_scale, background=BG, accent=ACCENT))
+        logo.create_image(0, 0, anchor="nw", image=logo._image)
         title_wrap = tk.Frame(header, bg=BG)
         title_wrap.pack(side="left")
         tk.Label(title_wrap, text="ArcMic", bg=BG, fg=TEXT, font=(DISPLAY_FONT, 22, "bold")).pack(anchor="w")
@@ -438,21 +547,7 @@ class ArcMicApp:
 
         divider = tk.Frame(controls, bg=BORDER, height=1)
         divider.pack(fill="x", pady=(self._px(12), self._px(16)))
-        self.listen_button = tk.Button(
-            controls,
-            text="耳机监听 15 秒",
-            command=self._toggle_monitor,
-            bg=ACCENT_LIGHT,
-            fg=ACCENT,
-            activebackground="#DDE3FF",
-            activeforeground=ACCENT,
-            relief="flat",
-            borderwidth=0,
-            cursor="hand2",
-            font=(UI_FONT, 11, "bold"),
-            padx=self._px(18),
-            pady=self._px(11),
-        )
+        self.listen_button = RoundedButton(controls, "耳机监听 15 秒", self._toggle_monitor, self.ui_scale)
         self.listen_button.pack(fill="x")
         tk.Label(
             controls,
@@ -519,7 +614,9 @@ class ArcMicApp:
     def _set_status(self, text: str, colour: str):
         self.status_label.configure(text=text, fg=colour)
         self.status_dot.delete("all")
-        self.status_dot.create_oval(*(self._px(v) for v in (2, 2, 10, 10)), fill=colour, outline="")
+        image = render_status_dot(self._px(12), self.ui_scale, background=BG, colour=colour)
+        self._status_dot_image = ImageTk.PhotoImage(image)
+        self.status_dot.create_image(0, 0, anchor="nw", image=self._status_dot_image)
         self._update_tray()
 
     def _receive_level(self, level: float):
@@ -534,10 +631,14 @@ class ArcMicApp:
             action()
             if self._exiting:
                 return
-        self.level_bar.set_level(self._pending_level)
-        self._pending_level = 0.0
-        self.level_bar.animate()
-        self.root.after(40, self._tick)
+        visible = self.root.state() != "withdrawn" and self.root.winfo_viewable()
+        if visible:
+            self.level_bar.set_level(self._pending_level)
+            self._pending_level = 0.0
+            self.level_bar.animate()
+        else:
+            self._pending_level = 0.0
+        self.root.after(UI_TICK_MS if visible else HIDDEN_TICK_MS, self._tick)
 
     def _current_input_index(self) -> int | None:
         if self.selected_device:
@@ -672,7 +773,12 @@ class ArcMicApp:
             self._refresh_audio_routes()
             output_index = self._current_output_index()
             self.monitor.start(self._current_input_index(), output_index, monitoring=True)
-            self.listen_button.configure(text="停止监听", bg="#FFF1E4", fg=AMBER)
+            self.listen_button.set_appearance(
+                text="停止监听",
+                background="#FFF1E4",
+                foreground=AMBER,
+                active_background="#FFE4C7",
+            )
             output = next(
                 (item for item in self.wasapi_outputs if int(item["index"]) == output_index),
                 None,
@@ -691,7 +797,12 @@ class ArcMicApp:
             self.root.after_cancel(self._monitor_timeout)
             self._monitor_timeout = None
         self.monitor.stop()
-        self.listen_button.configure(text="耳机监听 15 秒", bg=ACCENT_LIGHT, fg=ACCENT)
+        self.listen_button.set_appearance(
+            text="耳机监听 15 秒",
+            background=ACCENT_LIGHT,
+            foreground=ACCENT,
+            active_background="#DDE3FF",
+        )
         self._start_meter()
         if self.demo:
             self._set_status("界面预览 · 未修改系统", MUTED)
@@ -760,9 +871,13 @@ class ArcMicApp:
     def _update_tray(self):
         if self._tray_icon is None:
             return
+        title = self._tray_status_text()
+        if title == self._last_tray_title:
+            return
         try:
-            self._tray_icon.title = self._tray_status_text()
+            self._tray_icon.title = title
             self._tray_icon.update_menu()
+            self._last_tray_title = title
         except Exception:
             pass
 
