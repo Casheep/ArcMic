@@ -38,6 +38,24 @@ class GraphicsTests(unittest.TestCase):
         self.assertEqual(image.getpixel((0, 0)), (18, 52, 86))
         self.assertEqual(image.getpixel((50, 25)), (255, 255, 255))
 
+    def test_dial_stroke_is_centred_on_pointer_radius(self):
+        image = gain_dial(
+            286,
+            252,
+            1.0,
+            0,
+            30,
+            background="#ffffff",
+            track="#e1e5ed",
+            colour="#506cf5",
+            start=210,
+            span=-240,
+            centre=(143, 129),
+            radius=111,
+        ).convert("RGB")
+        self.assertEqual(image.getpixel((143, 18)), (225, 229, 237))
+        self.assertEqual(image.getpixel((143, 34)), (255, 255, 255))
+
 
 if __name__ == "__main__":
     unittest.main()

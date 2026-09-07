@@ -16,16 +16,7 @@ def _finish(image: Image.Image, width: int, height: int) -> Image.Image:
     return image.resize(_size(width, height), Image.Resampling.LANCZOS)
 
 
-def _point_on_arc(box: tuple[float, float, float, float], angle: float) -> tuple[float, float]:
-    left, top, right, bottom = box
-    radians = math.radians(angle)
-    return (
-        (left + right) / 2 + (right - left) / 2 * math.cos(radians),
-        (top + bottom) / 2 + (bottom - top) / 2 * math.sin(radians),
-    )
-
-
-def _round_arc(
+def _centred_arc(
     draw: ImageDraw.ImageDraw,
     box: tuple[float, float, float, float],
     start: float,
@@ -33,12 +24,22 @@ def _round_arc(
     fill: str,
     width: int,
 ) -> None:
+    """Draw an antialiased arc whose stroke is centred on ``box``.
+
+    Pillow draws wide arcs inside their bounding box, while Tk draws the
+    outline around the ellipse centreline. Expanding by half the stroke keeps
+    the visible arc aligned with the dial's pointer geometry.
+    """
     width = max(1, int(width))
-    draw.arc(box, start=start, end=end, fill=fill, width=width)
-    radius = width / 2
-    for angle in (start, end):
-        x, y = _point_on_arc(box, angle)
-        draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill=fill)
+    half_width = width / 2
+    left, top, right, bottom = box
+    draw.arc(
+        (left - half_width, top - half_width, right + half_width, bottom + half_width),
+        start=start,
+        end=end,
+        fill=fill,
+        width=width,
+    )
 
 
 def rounded_panel(
@@ -113,11 +114,11 @@ def gain_dial(
     line_width = max(1, round(18 * scale * factor))
     pillow_start = (-start) % 360
     pillow_end = pillow_start + abs(span)
-    _round_arc(draw, box, pillow_start, pillow_end, track, line_width)
+    _centred_arc(draw, box, pillow_start, pillow_end, track, line_width)
 
     ratio = min(1.0, max(0.0, value / maximum)) if maximum else 0.0
     if ratio > 0:
-        _round_arc(draw, box, pillow_start, pillow_start + abs(span) * ratio, colour, line_width)
+        _centred_arc(draw, box, pillow_start, pillow_start + abs(span) * ratio, colour, line_width)
 
     angle = math.radians(start + span * ratio)
     thumb_x = (centre[0] + radius * math.cos(angle)) * scale * factor
@@ -164,8 +165,8 @@ def arc_logo(size: int, scale: float, *, background: str, accent: str) -> Image.
     # Tk starts at 38 degrees above the x-axis and sweeps counter-clockwise.
     # Pillow's angles grow clockwise in screen coordinates, so -38 is the
     # matching starting point and the 285-degree sweep can stay positive.
-    _round_arc(draw, box((4, 4, 42, 42)), 322, 607, accent, round(5 * scale * factor))
-    _round_arc(draw, box((12, 12, 34, 34)), 322, 607, "#A8B5FF", round(5 * scale * factor))
+    _centred_arc(draw, box((4, 4, 42, 42)), 322, 607, accent, round(5 * scale * factor))
+    _centred_arc(draw, box((12, 12, 34, 34)), 322, 607, "#A8B5FF", round(5 * scale * factor))
     draw.ellipse(box((19, 19, 27, 27)), fill=accent)
     return _finish(image, size, size)
 
