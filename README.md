@@ -31,7 +31,7 @@ ArcMic 处理 Windows 共享模式录音流，适用于大多数使用 WASAPI �
 
 ## 开源许可
 
-ArcMic 集成并随 EXE 分发以下开源组件，但没有修改它们的源码。它们仍归原作者所有，并继续遵循各自的 GPL 许可证；使用或再分发 ArcMic 时应保留许可证与源码获取方式：
+ArcMic 集成并随 EXE 分发以下开源组件，但没有修改它们的源码。它们仍归原作者所有；使用或再分发 ArcMic 时应保留许可证与源码获取方式：
 
 - [Equalizer APO 1.4.2](https://sourceforge.net/projects/equalizerapo/files/1.4.2/)（GPL-2.0-or-later）：Windows 系统级低延迟麦克风处理
 - [Real-time Noise Suppression Plugin 1.21](https://github.com/werman/noise-suppression-for-voice/tree/v1.21)（GPL-3.0）：基于 RNNoise 的本地 AI 降噪
@@ -48,4 +48,4 @@ ArcMic 集成并随 EXE 分发以下开源组件，但没有修改它们的源�
 
 ## 许可证
 
-ArcMic 自行编写的源代码采用 [MIT License](LICENSE)。MIT 仅适用于 ArcMic 自有代码，不会替代或放宽上述第三方组件的 GPL、LGPL 或其他许可条款。
+ArcMic 采用 [GNU General Public License v3.0](LICENSE)。选择 GPL-3.0 是因为项目集成了 GPL-2.0-or-later 的 Equalizer APO 和 GPL-3.0 的 RNNoise 插件；其他第三方组件继续遵循各自许可证。
