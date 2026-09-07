@@ -28,7 +28,9 @@ draw = ImageDraw.Draw(image)
 arc_radius = 106 * SCALE
 arc_width = 20 * SCALE
 arc_box = (CENTRE - arc_radius, CENTRE - arc_radius, CENTRE + arc_radius, CENTRE + arc_radius)
-arc_start, arc_end = 340, 560
+# Put the opening at the upper-right (315 degrees), giving the ring the same
+# lively 45-degree tilt as the original ArcMic mark.
+arc_start, arc_end = 25, 245
 draw.arc(arc_box, start=arc_start, end=arc_end, fill=ACCENT, width=arc_width)
 cap_radius = arc_width / 2
 for angle in (arc_start, arc_end):

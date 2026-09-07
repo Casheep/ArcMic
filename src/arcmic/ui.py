@@ -190,7 +190,15 @@ class GainDial(tk.Canvas):
 
 class LevelBar(tk.Canvas):
     def __init__(self, parent, width: int = 610, scale: float = 1.0):
-        super().__init__(parent, width=round(width * scale), height=round(18 * scale), highlightthickness=0, bg=CARD)
+        self._height = round(18 * scale)
+        super().__init__(
+            parent,
+            width=round(width * scale),
+            height=self._height,
+            borderwidth=0,
+            highlightthickness=0,
+            bg=CARD,
+        )
         self._width = round(width * scale)
         self._scale = scale
         self.level = 0.0
@@ -201,8 +209,10 @@ class LevelBar(tk.Canvas):
 
     def _resize(self, event):
         width = max(1, event.width)
-        if width != self._width:
+        height = max(1, event.height)
+        if width != self._width or height != self._height:
             self._width = width
+            self._height = height
             self.draw(force=True)
 
     def set_level(self, level: float):
@@ -222,14 +232,14 @@ class LevelBar(tk.Canvas):
 
     def draw(self, force: bool = False):
         colour = GREEN if self.display_level < 0.78 else (AMBER if self.display_level < 0.93 else RED)
-        render_key = (self._width, round(self.display_level, 3), colour)
+        render_key = (self._width, self._height, round(self.display_level, 3), colour)
         if not force and render_key == self._last_render_key:
             return
         self._last_render_key = render_key
         self.delete("all")
         image = render_level_meter(
             self._width,
-            round(18 * self._scale),
+            self._height,
             self._scale,
             self.display_level,
             background=CARD,
@@ -567,7 +577,9 @@ class ArcMicApp:
         tk.Label(top, text="实时音量", bg=CARD, fg=TEXT, font=(UI_FONT, 10, "bold")).pack(side="left")
         tk.Label(top, text="仅本机处理 · 不录音 · 不上传", bg=CARD, fg=GREEN, font=(UI_FONT, 9)).pack(side="right")
         self.level_bar = LevelBar(meter_card, scale=self.ui_scale)
-        self.level_bar.pack(fill="x", pady=(self._px(11), 0))
+        # The card has 44 px of usable height.  A 5 px gap leaves enough room
+        # for the complete 18 px meter instead of clipping its lower half.
+        self.level_bar.pack(fill="x", pady=(self._px(5), 0))
 
         footer = tk.Frame(outer, bg=BG)
         footer.pack(fill="x", pady=(self._px(13), 0))

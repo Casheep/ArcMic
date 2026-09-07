@@ -90,6 +90,24 @@ class GraphicsTests(unittest.TestCase):
         self.assertGreater(centre[1], centre[0] + 100)
         self.assertNotEqual(top, centre)
 
+    def test_volume_meter_caps_are_complete_and_vertically_symmetric(self):
+        image = level_meter(
+            200,
+            18,
+            1.0,
+            0.5,
+            background="#ffffff",
+            track="#e1e5ed",
+            colour="#20b97a",
+        ).convert("RGB")
+        green = (32, 185, 122)
+        coloured_rows = [y for y in range(image.height) if green in [image.getpixel((x, y)) for x in range(image.width)]]
+        self.assertEqual(coloured_rows[0] + coloured_rows[-1], image.height - 1)
+        centre_y = image.height // 2
+        left_extent = min(x for x in range(image.width) if image.getpixel((x, centre_y)) == green)
+        top_extent = min(x for x in range(image.width) if image.getpixel((x, coloured_rows[0])) == green)
+        self.assertGreater(top_extent, left_extent)
+
 
 if __name__ == "__main__":
     unittest.main()

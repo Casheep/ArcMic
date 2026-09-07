@@ -183,9 +183,12 @@ def level_meter(width: int, height: int, scale: float, level: float, *, backgrou
     factor = SUPERSAMPLE
     image = Image.new("RGBA", (width * factor, height * factor), background)
     draw = ImageDraw.Draw(image)
-    inset = max(1, round(scale)) * factor
+    # Base the geometry on the real bitmap height.  The Tk canvas may be
+    # resized independently from the UI scale, so fixed 2..16 coordinates can
+    # otherwise be clipped and leave only a quarter-circle visible.
+    inset = max(1, round(height * 0.06)) * factor
     left, right = inset, width * factor - inset - 1
-    top, bottom = 2 * scale * factor, 16 * scale * factor
+    top, bottom = inset, height * factor - inset - 1
     _capsule(draw, left, top, right, bottom, track)
 
     level = min(1.0, max(0.0, level))
