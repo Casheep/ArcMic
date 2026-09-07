@@ -1,3 +1,4 @@
+import os
 import subprocess
 import tempfile
 import unittest
@@ -48,6 +49,22 @@ class EngineSafetyTests(unittest.TestCase):
     def test_bundled_rnnoise_hash_matches_release(self):
         plugin = Path(__file__).parents[1] / "vendor" / "rnnoise" / "rnnoise_mono.dll"
         self.assertEqual(engine._file_sha256(plugin), engine.RNNOISE_SHA256)
+
+    def test_elevated_frozen_process_starts_with_fresh_pyinstaller_environment(self):
+        variable = "PYINSTALLER_RESET_ENVIRONMENT"
+        observed = []
+
+        def launch(_info):
+            observed.append(os.environ.get(variable))
+            return True
+
+        info = engine.SHELLEXECUTEINFOW()
+        with patch.dict(os.environ, {variable: "previous"}, clear=False):
+            with patch.object(engine.ctypes.windll.shell32, "ShellExecuteExW", side_effect=launch):
+                self.assertTrue(engine._shell_execute_elevated(info, reset_frozen_environment=True))
+            self.assertEqual(os.environ[variable], "previous")
+
+        self.assertEqual(observed, ["1"])
 
 
 if __name__ == "__main__":

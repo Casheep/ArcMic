@@ -16,7 +16,7 @@ Windows 游戏麦克风增益与本地降噪工具。
 - 最小化到系统托盘，可随时查看开关状态
 - 本地运行，无账号、无录音、无遥测、无网络请求
 
-![ArcMic 界面](docs/ui-preview.png)
+![ArcMic 界面](docs/ui-preview-v0.2.7.png)
 
 ## 使用
 

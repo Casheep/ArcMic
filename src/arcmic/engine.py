@@ -488,8 +488,25 @@ class SHELLEXECUTEINFOW(ctypes.Structure):
     ]
 
 
+def _shell_execute_elevated(info: SHELLEXECUTEINFOW, reset_frozen_environment: bool) -> bool:
+    """Start the elevated process without reusing a one-file parent runtime."""
+    variable = "PYINSTALLER_RESET_ENVIRONMENT"
+    previous = os.environ.get(variable)
+    if reset_frozen_environment:
+        os.environ[variable] = "1"
+    try:
+        return bool(ctypes.windll.shell32.ShellExecuteExW(ctypes.byref(info)))
+    finally:
+        if reset_frozen_environment:
+            if previous is None:
+                os.environ.pop(variable, None)
+            else:
+                os.environ[variable] = previous
+
+
 def run_elevated_and_wait(arguments: list[str]) -> int:
-    if getattr(sys, "frozen", False):
+    frozen = bool(getattr(sys, "frozen", False))
+    if frozen:
         executable = sys.executable
         params = subprocess.list2cmdline(arguments)
         directory = str(Path(sys.executable).parent)
@@ -507,7 +524,7 @@ def run_elevated_and_wait(arguments: list[str]) -> int:
     info.lpParameters = params
     info.lpDirectory = directory
     info.nShow = 0
-    if not ctypes.windll.shell32.ShellExecuteExW(ctypes.byref(info)):
+    if not _shell_execute_elevated(info, reset_frozen_environment=frozen):
         return int(ctypes.windll.kernel32.GetLastError()) or 1
     try:
         ctypes.windll.kernel32.WaitForSingleObject(info.hProcess, 120_000)
