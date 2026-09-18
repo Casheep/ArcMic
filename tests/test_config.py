@@ -77,14 +77,13 @@ class ConfigTests(unittest.TestCase):
         settings = AppSettings(noise_mode="unexpected").normalized()
         self.assertEqual(settings.noise_mode, "ai_hum")
 
-    def test_live_config_falls_back_when_atomic_replace_is_locked(self):
+    def test_existing_live_config_is_updated_in_place(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "ArcMic.txt"
             target.write_text("old", encoding="utf-8")
-            locked = PermissionError(13, "locked")
-            locked.winerror = 5
-            with patch("pathlib.Path.replace", side_effect=locked):
+            with patch("pathlib.Path.replace") as replace_file:
                 write_managed_config(AppSettings(enabled=False), target)
+            replace_file.assert_not_called()
             self.assertIn("Enhancement is off", target.read_text(encoding="utf-8"))
             self.assertFalse(target.with_suffix(".tmp").exists())
 

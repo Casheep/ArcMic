@@ -5,7 +5,7 @@ import ctypes
 import traceback
 
 from .config import local_app_dir
-from .engine import install_or_repair, restore_system, set_diagnostic_trace
+from .engine import DEFAULT_INSTALL_MODE, install_or_repair, restore_system, set_diagnostic_trace
 
 
 _instance_mutex = None
@@ -51,7 +51,7 @@ def _write_setup_error() -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="ArcMic", add_help=True)
     parser.add_argument("--setup", metavar="DEVICE_GUID", help="install or repair the system audio binding")
-    parser.add_argument("--install-mode", choices=("sfx", "lfx"), default="sfx", help=argparse.SUPPRESS)
+    parser.add_argument("--install-mode", choices=("sfx", "lfx"), default=DEFAULT_INSTALL_MODE, help=argparse.SUPPRESS)
     parser.add_argument("--restore", action="store_true", help="restore audio endpoint settings")
     parser.add_argument("--diagnostic-trace", choices=("on", "off"), help=argparse.SUPPRESS)
     parser.add_argument("--demo", action="store_true", help="show the interface without changing the system")

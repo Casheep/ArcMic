@@ -361,7 +361,9 @@ class ArcMicApp:
         self.root.geometry(f"{self._px(820)}x{self._px(760)}")
         self.root.minsize(self._px(780), self._px(720))
         self.root.configure(bg=BG)
-        self.root.protocol("WM_DELETE_WINDOW", self._hide_to_tray)
+        # Closing from either the title bar or the taskbar must really exit.
+        # Only the minimise button sends ArcMic to the notification area.
+        self.root.protocol("WM_DELETE_WINDOW", self._exit_app)
         self.root.bind("<Unmap>", self._on_unmap)
         self._round_window_corners()
 
@@ -583,7 +585,7 @@ class ArcMicApp:
 
         footer = tk.Frame(outer, bg=BG)
         footer.pack(fill="x", pady=(self._px(13), 0))
-        tk.Label(footer, text="关闭或最小化后驻留托盘，可随时查看开关状态", bg=BG, fg=MUTED, font=(UI_FONT, 9)).pack(side="left")
+        tk.Label(footer, text="最小化后驻留托盘；关闭窗口将退出 ArcMic", bg=BG, fg=MUTED, font=(UI_FONT, 9)).pack(side="left")
         restore = tk.Label(footer, text="恢复系统设置", bg=BG, fg=ACCENT, cursor="hand2", font=(UI_FONT, 9, "underline"))
         restore.pack(side="right")
         restore.bind("<Button-1>", self._restore)
@@ -756,6 +758,9 @@ class ArcMicApp:
             return
         if self._setup_running:
             return
+        # The elevated helper reads these settings and writes the live APO
+        # configuration before it restarts Windows Audio.
+        self.store.save(self.settings)
         self._setup_running = True
         self._set_status("首次配置 · 请允许系统授权", AMBER)
 
@@ -923,19 +928,25 @@ class ArcMicApp:
             return
         self._exiting = True
         self.monitor.stop()
-        if not self.demo:
-            self.store.save(self.settings)
-            write_managed_config(replace(self.settings, enabled=False))
-        if self._tray_icon is not None:
-            try:
-                self._tray_icon.stop()
-            except Exception:
-                pass
-            self._tray_icon = None
-        self.root.destroy()
+        try:
+            if not self.demo:
+                self.store.save(self.settings)
+                write_managed_config(replace(self.settings, enabled=False))
+        except OSError:
+            # A locked or damaged config must never make the app impossible
+            # to close.  Startup repair will reconcile it next time.
+            pass
+        finally:
+            if self._tray_icon is not None:
+                try:
+                    self._tray_icon.stop()
+                except Exception:
+                    pass
+                self._tray_icon = None
+            self.root.destroy()
 
     def close(self):
-        self._hide_to_tray()
+        self._exit_app()
 
     def run(self) -> None:
         try:

@@ -9,6 +9,9 @@ from arcmic import engine
 
 
 class EngineSafetyTests(unittest.TestCase):
+    def test_compatibility_install_mode_is_the_default(self):
+        self.assertEqual(engine.DEFAULT_INSTALL_MODE, "sfx")
+
     def test_endpoint_access_requests_values_only(self):
         self.assertTrue(engine.ENDPOINT_VALUE_ACCESS & engine.winreg.KEY_SET_VALUE)
         self.assertTrue(engine.ENDPOINT_VALUE_ACCESS & engine.winreg.KEY_QUERY_VALUE)

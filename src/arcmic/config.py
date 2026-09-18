@@ -127,18 +127,19 @@ def write_managed_config(settings: AppSettings, path: Path | None = None) -> Pat
     target = path or equalizer_config_dir() / "ArcMic.txt"
     target.parent.mkdir(parents=True, exist_ok=True)
     plugin_path = program_data_dir() / "engine" / "rnnoise_mono.dll"
-    temporary = target.with_suffix(".tmp")
     content = render_eapo_config(settings, plugin_path)
-    temporary.write_text(content, encoding="utf-8")
-    try:
+    if target.exists():
+        # Equalizer APO watches the live file. Replacing it with a new file can
+        # leave an already-running capture graph watching the old file object,
+        # which makes gain changes appear intermittent in voice clients.
+        with target.open("w", encoding="utf-8", newline="\n") as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+    else:
+        temporary = target.with_suffix(".tmp")
+        temporary.write_text(content, encoding="utf-8")
         temporary.replace(target)
-    except OSError as exc:
-        # audiodg/Equalizer APO may keep the live config open without FILE_SHARE_DELETE.
-        # Replacing the inode then fails even though editing the file itself is allowed.
-        if getattr(exc, "winerror", None) not in (5, 32):
-            raise
-        temporary.unlink(missing_ok=True)
-        target.write_text(content, encoding="utf-8")
     return target
 
 

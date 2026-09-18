@@ -14,11 +14,13 @@ from pathlib import Path
 
 from .config import (
     INCLUDE_BEGIN,
+    SettingsStore,
     equalizer_config_dir,
     local_app_dir,
     patch_main_config,
     program_data_dir,
     remove_managed_include,
+    write_managed_config,
 )
 from .devices import CAPTURE_ROOT, CaptureDevice, list_capture_devices
 
@@ -55,6 +57,8 @@ ENGINE_FILES = (
 )
 ENDPOINT_VALUE_ACCESS = winreg.KEY_QUERY_VALUE | winreg.KEY_SET_VALUE | winreg.KEY_WOW64_64KEY
 RNNOISE_SHA256 = "664ce729baca985652c24515593e43a7c0105f7a0fb64e75b6b90776b9bd6495"
+DEFAULT_INSTALL_MODE = "sfx"
+BINDING_REVISION = 2
 
 
 def is_admin() -> bool:
@@ -94,12 +98,13 @@ def engine_registered() -> bool:
         return False
 
 
-def endpoint_bound(guid: str) -> bool:
+def endpoint_bound(guid: str, install_mode: str | None = None) -> bool:
     key_path = CAPTURE_ROOT + rf"\{guid}\FxProperties"
     access = winreg.KEY_READ | winreg.KEY_WOW64_64KEY
     try:
         with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path, 0, access) as key:
-            for name in (FX_NAMES["sfx"], FX_NAMES["lfx"]):
+            names = (FX_NAMES[install_mode],) if install_mode in ("sfx", "lfx") else (FX_NAMES["sfx"], FX_NAMES["lfx"])
+            for name in names:
                 try:
                     if str(winreg.QueryValueEx(key, name)[0]).casefold() == PRE_MIX_GUID.casefold():
                         return True
@@ -125,7 +130,7 @@ def _rnnoise_current(path: Path) -> bool:
         return False
 
 
-def installation_ready(guid: str) -> bool:
+def installation_ready(guid: str, install_mode: str = DEFAULT_INSTALL_MODE) -> bool:
     _, config_path = get_eapo_paths()
     plugin = program_data_dir() / "engine" / "rnnoise_mono.dll"
     main_config = (config_path / "config.txt") if config_path else None
@@ -137,7 +142,13 @@ def installation_ready(guid: str) -> bool:
             include_ok = INCLUDE_BEGIN in content and expected in content
         except OSError:
             pass
-    return engine_registered() and _rnnoise_current(plugin) and endpoint_bound(guid) and include_ok
+    binding = _load_state().get("bindings", {}).get(guid, {})
+    binding_ok = (
+        binding.get("managed")
+        and binding.get("install_mode") == install_mode
+        and binding.get("revision") == BINDING_REVISION
+    )
+    return engine_registered() and _rnnoise_current(plugin) and endpoint_bound(guid, install_mode) and include_ok and binding_ok
 
 
 def _json_value(value: object, value_type: int) -> dict:
@@ -284,6 +295,7 @@ def _bind_endpoint(device: CaptureDevice, state: dict, install_mode: str = "sfx"
             pass
 
         binding["install_mode"] = install_mode
+        binding["revision"] = BINDING_REVISION
 
     preferred_original = backup[FX_NAMES["sfx" if install_mode == "sfx" else "lfx"]]
     child = str(preferred_original.get("value", "")) if preferred_original.get("present") else ""
@@ -333,7 +345,7 @@ def _set_audio_service(command: str) -> None:
         raise RuntimeError(f"Windows 音频服务更新准备失败（代码 {completed.returncode}）")
 
 
-def install_or_repair(device_guid: str = "", install_mode: str = "sfx") -> int:
+def install_or_repair(device_guid: str = "", install_mode: str = DEFAULT_INSTALL_MODE) -> int:
     if not is_admin():
         return 5
     state = _load_state()
@@ -377,8 +389,13 @@ def install_or_repair(device_guid: str = "", install_mode: str = "sfx") -> int:
     assert config_path is not None
     managed = config_path / "ArcMic.txt"
     managed.parent.mkdir(parents=True, exist_ok=True)
-    if not managed.exists():
-        managed.write_text("# ArcMic is waiting for the first settings update.\n", encoding="utf-8")
+    # Write the effective settings before restarting Windows Audio.  Some voice
+    # clients keep their capture graph alive and do not notice a config file
+    # update reliably until that graph is rebuilt.
+    settings = SettingsStore().load()
+    if device_guid:
+        settings.device_guid = device_guid
+    write_managed_config(settings, managed)
     main_config = config_path / "config.txt"
     existing = main_config.read_text(encoding="utf-8-sig") if main_config.exists() else ""
     main_config.parent.mkdir(parents=True, exist_ok=True)

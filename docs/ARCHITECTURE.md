@@ -33,13 +33,13 @@ The trade-off is that software explicitly requesting RAW, exclusive WASAPI or AS
 1. The ordinary user process identifies the default WASAPI microphone and matches it to the corresponding MMDevice endpoint.
 2. A narrowly scoped elevated helper copies the bundled engine to `%PROGRAMDATA%\ArcMic\engine`.
 3. If Equalizer APO already exists, ArcMic reuses it. Otherwise the helper registers the bundled minimal APO engine.
-4. The helper backs up only the target endpoint values it changes and attaches the pre-mix APO.
+4. The helper backs up only the target endpoint values it changes and attaches the pre-mix APO using the Windows 10/11 SFX capture binding.
 5. One marked include block is appended to the existing Equalizer APO `config.txt`; existing filters remain untouched.
-6. Windows Audio is restarted once. Subsequent changes are picked up from `%LOCALAPPDATA%\ArcMic\ArcMic.txt` without elevation or restart.
+6. The current settings are written before Windows Audio is restarted, ensuring already-running voice clients rebuild against the active gain. Subsequent changes are picked up without elevation or restart.
 
 ## Runtime boundaries
 
-- The managed config is atomically replaced to avoid partial reads.
+- Existing managed configs are updated in place so Equalizer APO's live watcher and already-running capture graphs consistently observe gain changes. New configs are installed atomically.
 - Endpoint rollback data is persisted before registry values are changed, and native engine files remain administrator-writable only.
 - Gain is clamped to 30 dB in both persisted settings and config rendering.
 - Monitoring automatically ends after 15 seconds and never writes samples to disk.
